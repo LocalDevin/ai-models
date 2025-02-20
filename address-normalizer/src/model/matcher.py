@@ -83,8 +83,16 @@ class AddressMatcher:
         """Initialize database from CSV with memory-efficient loading."""
         print("Loading reference data...")
         
+        # Validate and adjust path for language-specific data
+        data_path = Path(csv_path)
+        if not data_path.is_absolute():
+            lang_dir = Path("test_data") / self.language
+            data_path = lang_dir / data_path.name
+            if not data_path.exists():
+                raise FileNotFoundError(f"No language-specific data found at {data_path}")
+        
         # Use AddressLoader for efficient loading
-        loader = AddressLoader(csv_path, self.data_config)
+        loader = AddressLoader(str(data_path), self.data_config)
         self.reference_data = []
         
         # Load addresses and cache embeddings
@@ -98,7 +106,7 @@ class AddressMatcher:
                     self.embeddings_cache[addr['full_address']] = self.transformer.encode(addr['full_address'])
         
         gc.collect()  # Free memory
-        print(f"Loaded {len(self.reference_data)} addresses")
+        print(f"Loaded {len(self.reference_data)} addresses for language {self.language}")
     
     def train(self, data_path: str, config: TrainingConfig) -> Dict[str, float]:
         """Train the network with mixed precision and GPU optimization."""
