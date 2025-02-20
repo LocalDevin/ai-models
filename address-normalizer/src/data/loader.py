@@ -73,31 +73,9 @@ class AddressLoader:
                 if self.sample_size and records_yielded >= self.sample_size:
                     return
                     
-                    addr = {
-                        'nPLZ': row['nPLZ'],
-                        'cOrtsname': row['cOrtsname'],
-                        'cStrassenname': row['cStrassenname'],
-                        'full_address': f"{row['nPLZ']} {row['cOrtsname']} {row['cStrassenname']}"
-                    }
-                    yield addr
-                    
-                    records_yielded += 1
-                    pbar.update(1)
-                    
                     if records_yielded % 1000 == 0:  # Log every 1000 records
                         mem = psutil.Process().memory_info()
                         print(f"\nMemory usage: {mem.rss / 1024 / 1024:.1f}MB")
-                
-                for _, row in chunk.iterrows():
-                    if self.sample_size and records_yielded >= self.sample_size:
-                        return
-                    yield {
-                        'nPLZ': row['nPLZ'],
-                        'cOrtsname': row['cOrtsname'],
-                        'cStrassenname': row['cStrassenname'],
-                        'full_address': f"{row['nPLZ']} {row['cOrtsname']} {row['cStrassenname']}"
-                    }
-                    records_yielded += 1
     
     def load_full(self) -> pd.DataFrame:
         """Load entire dataset efficiently using memory mapping."""
