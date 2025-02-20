@@ -101,7 +101,7 @@ class AddressMatcher:
                 raise FileNotFoundError(f"No language-specific data found at {data_path}")
         
         # Use AddressLoader for efficient loading
-        loader = AddressLoader(str(data_path), self.data_config)
+        loader = AddressLoader(str(data_path), self.data_config, sample_size=sample_size)
         self.reference_data = []
         print(f"Loading up to {sample_size} addresses...")
         

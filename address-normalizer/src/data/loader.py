@@ -8,9 +8,10 @@ from tqdm import tqdm
 from ..config import DataConfig
 
 class AddressLoader:
-    def __init__(self, file_path: str, config: DataConfig):
+    def __init__(self, file_path: str, config: DataConfig, sample_size: Optional[int] = None):
         self.file_path = Path(file_path).resolve()
         self.config = config
+        self.sample_size = sample_size
         if not self.file_path.exists():
             raise FileNotFoundError(f"File not found: {self.file_path}")
         self._map_file()
@@ -31,12 +32,14 @@ class AddressLoader:
         self.mm.seek(0)
         total_size = self.file_path.stat().st_size
         processed = 0
+        records_yielded = 0
         
         df_iter = pd.read_csv(
             self.mm, 
             delimiter=';',
-            chunksize=self.config.chunk_size,
-            dtype={'nPLZ': str}
+            chunksize=min(self.config.chunk_size, self.sample_size if self.sample_size else self.config.chunk_size),
+            dtype={'nPLZ': str},
+            nrows=self.sample_size
         )
         
         with tqdm(total=total_size, desc="Loading addresses") as pbar:
