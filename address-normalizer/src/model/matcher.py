@@ -19,20 +19,32 @@ from .network import SiameseNetwork
 
 # Constants for model persistence and language support
 MODELS_DIR = Path("models")
-DEFAULT_LANGUAGE = "DE"
-SUPPORTED_LANGUAGES = ["DE"]  # Expandable for future languages
-EMBEDDING_MODELS = {
-    "DE": "sentence-transformers/all-MiniLM-L6-v2",  # Current model
-    # Future language-specific models can be added here
+SUPPORTED_LANGUAGES = {
+    "DE": {
+        "name": "German",
+        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "test_data": ["addresses.csv", "test_cases.csv"],
+        "weights": {
+            "zip": 2.0,    # Highest priority
+            "city": 1.5,   # Medium priority
+            "street": 1.2  # Lower priority
+        }
+    },
+    "EN": {
+        "name": "English",
+        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "test_data": ["addresses.csv", "test_cases.csv"],
+        "weights": {
+            "zip": 2.0,
+            "city": 1.5,
+            "street": 1.2
+        }
+    }
 }
+DEFAULT_LANGUAGE = "DE"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
-
-# Weight multipliers for hierarchical matching
-ZIP_WEIGHT = 2.0    # Highest priority
-CITY_WEIGHT = 1.5   # Medium priority
-STREET_WEIGHT = 1.2 # Lower priority
 
 # Constants
 EMBEDDING_DIM = 384  # MiniLM produces 384-dim vectors
