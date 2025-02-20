@@ -44,16 +44,25 @@ class AddressLoader:
         
         with tqdm(total=self.sample_size if self.sample_size else None, desc="Loading addresses") as pbar:
             for chunk in df_iter:
-                for _ in chunk.iterrows():
+                for _, row in chunk.iterrows():
                     if self.sample_size and records_yielded >= self.sample_size:
                         pbar.close()
                         return
+                    
+                    addr = {
+                        'nPLZ': row['nPLZ'],
+                        'cOrtsname': row['cOrtsname'],
+                        'cStrassenname': row['cStrassenname'],
+                        'full_address': f"{row['nPLZ']} {row['cOrtsname']} {row['cStrassenname']}"
+                    }
+                    yield addr
+                    
                     records_yielded += 1
                     pbar.update(1)
-                
-                if processed % (100 * 1024 * 1024) == 0:  # Log every 100MB
-                    mem = psutil.Process().memory_info()
-                    print(f"\nMemory usage: {mem.rss / 1024 / 1024:.1f}MB")
+                    
+                    if records_yielded % 1000 == 0:  # Log every 1000 records
+                        mem = psutil.Process().memory_info()
+                        print(f"\nMemory usage: {mem.rss / 1024 / 1024:.1f}MB")
                 
                 for _, row in chunk.iterrows():
                     if self.sample_size and records_yielded >= self.sample_size:
