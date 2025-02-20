@@ -53,17 +53,25 @@ NUM_WORKERS = 4     # Increase if you have more CPU cores for DataLoader
 PIN_MEMORY = True if device.type == "cuda" else False
 
 class AddressMatcher:
-    def __init__(self, device: Optional[str] = None):
-        """Initialize matcher with device-aware components."""
+    def __init__(self, language: str = DEFAULT_LANGUAGE, device: Optional[str] = None):
+        """Initialize matcher with language and device settings."""
+        if language not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"Unsupported language: {language}. Supported: {list(SUPPORTED_LANGUAGES.keys())}")
+        
+        self.language = language
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
         
-        # Initialize components
+        # Initialize components with language-specific settings
         self.model_config = ModelConfig()
         self.data_config = DataConfig()
         self.network = SiameseNetwork(self.model_config).to(self.device)
-        self.transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        self.transformer = SentenceTransformer(SUPPORTED_LANGUAGES[language]['embedding_model'])
         self.transformer.to(self.device)
+        
+        # Set up model directory
+        self.model_dir = MODELS_DIR / language
+        self.model_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize training components
         self.scaler = torch.amp.GradScaler()  # GradScaler automatically handles device type
@@ -297,13 +305,16 @@ class AddressMatcher:
                     0.8 if self._partial_match(addr['cStrassenname'].lower(), street.lower()) else 0.0
                 )
                 
+                # Get language-specific weights
+                weights = SUPPORTED_LANGUAGES[self.language]['weights']
+                
                 # Weighted combination of neural and rule-based scores
                 neural_score = float(score)
                 component_score = (
-                    postal_match * ZIP_WEIGHT +
-                    city_match * CITY_WEIGHT +
-                    street_match * STREET_WEIGHT
-                ) / (ZIP_WEIGHT + CITY_WEIGHT + STREET_WEIGHT)
+                    postal_match * weights['zip'] +
+                    city_match * weights['city'] +
+                    street_match * weights['street']
+                ) / (weights['zip'] + weights['city'] + weights['street'])
                 
                 # Final score combines both approaches
                 final_score = 0.7 * neural_score + 0.3 * component_score
