@@ -53,15 +53,15 @@ class AddressLoader:
                     chunk = chunk.iloc[:(self.sample_size - records_yielded)]
                 
                 # Convert chunk to records
-                records = chunk.apply(
-                    lambda row: {
+                records = [
+                    {
                         'nPLZ': row['nPLZ'],
                         'cOrtsname': row['cOrtsname'],
                         'cStrassenname': row['cStrassenname'],
                         'full_address': f"{row['nPLZ']} {row['cOrtsname']} {row['cStrassenname']}"
-                    },
-                    axis=1
-                ).tolist()
+                    }
+                    for _, row in chunk.iterrows()
+                ]
                 
                 # Update progress and yield records
                 records_yielded += len(records)
