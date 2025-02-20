@@ -32,8 +32,8 @@ class AddressLoader:
         self.mm.seek(0)
         records_yielded = 0
         
-        # Configure chunk size based on sample size
-        chunk_size = min(self.config.chunk_size, self.sample_size if self.sample_size else self.config.chunk_size)
+        # Use larger chunk size for better performance
+        chunk_size = 5000 if self.sample_size is None else min(5000, self.sample_size)
         
         # Read data in chunks
         df_iter = pd.read_csv(
@@ -47,9 +47,31 @@ class AddressLoader:
         # Process chunks with progress tracking
         with tqdm(total=self.sample_size, desc="Loading addresses", unit="records") as pbar:
             for chunk in df_iter:
-                for _, row in chunk.iterrows():
-                    if self.sample_size and records_yielded >= self.sample_size:
-                        return
+                # Process entire chunk at once
+                if self.sample_size and records_yielded + len(chunk) > self.sample_size:
+                    # Trim chunk to fit sample size
+                    chunk = chunk.iloc[:(self.sample_size - records_yielded)]
+                
+                # Convert chunk to records
+                records = chunk.apply(
+                    lambda row: {
+                        'nPLZ': row['nPLZ'],
+                        'cOrtsname': row['cOrtsname'],
+                        'cStrassenname': row['cStrassenname'],
+                        'full_address': f"{row['nPLZ']} {row['cOrtsname']} {row['cStrassenname']}"
+                    },
+                    axis=1
+                ).tolist()
+                
+                # Update progress and yield records
+                records_yielded += len(records)
+                pbar.update(len(records))
+                
+                for record in records:
+                    yield record
+                
+                if self.sample_size and records_yielded >= self.sample_size:
+                    return
                     
                     addr = {
                         'nPLZ': row['nPLZ'],
