@@ -79,8 +79,13 @@ class AddressMatcher:
         self.reference_data = []
         self.embeddings_cache = {}
         
-    def initialize_database(self, csv_path: str, sample_size: Optional[int] = None) -> None:
-        """Initialize database from CSV with memory-efficient loading."""
+    def initialize_database(self, csv_path: str, sample_size: Optional[int] = 10000) -> None:
+        """Initialize database from CSV with memory-efficient loading.
+        
+        Args:
+            csv_path: Path to the CSV file
+            sample_size: Maximum number of addresses to load (default: 10000)
+        """
         print("Loading reference data...")
         
         # Validate and adjust path for language-specific data
@@ -94,6 +99,7 @@ class AddressMatcher:
         # Use AddressLoader for efficient loading
         loader = AddressLoader(str(data_path), self.data_config)
         self.reference_data = []
+        print(f"Loading up to {sample_size} addresses...")
         
         # Load addresses and cache embeddings
         for addr in tqdm(loader, desc="Processing addresses"):
