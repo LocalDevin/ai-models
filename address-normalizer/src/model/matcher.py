@@ -164,8 +164,7 @@ class AddressMatcher:
         
         # Load data if path provided
         if data_path:
-            loader = AddressLoader(data_path, self.data_config)
-            self.reference_data = list(loader)
+            self.initialize_database(data_path, sample_size=sample_size)
         
         if not self.reference_data:
             raise ValueError("No reference data available for training")
