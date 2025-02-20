@@ -106,10 +106,7 @@ class AddressMatcher:
         print(f"Loading up to {sample_size} addresses...")
         
         # Load addresses and cache embeddings
-        for addr in tqdm(loader, desc="Processing addresses"):
-            if sample_size and len(self.reference_data) >= sample_size:
-                break
-                
+        for addr in loader:
             self.reference_data.append(addr)
             if addr['full_address'] not in self.embeddings_cache:
                 with torch.autocast(device_type=self.device):
