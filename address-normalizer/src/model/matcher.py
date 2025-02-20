@@ -269,8 +269,8 @@ class AddressMatcher:
         if not filtered_matches:
             filtered_matches = self.reference_data
         
-        for i in tqdm(range(0, len(postal_matches), batch_size), desc="Finding matches"):
-            batch = postal_matches[i:i + batch_size]
+        for i in tqdm(range(0, len(filtered_matches), batch_size), desc="Finding matches"):
+            batch = filtered_matches[i:i + batch_size]
             
             # Process missing embeddings in batch
             missing_addrs = [addr for addr in batch if addr['full_address'] not in self.embeddings_cache]
@@ -330,9 +330,16 @@ class AddressMatcher:
                     street_match * weights['street']
                 ) / (weights['zip'] + weights['city'] + weights['street'])
                 
-                # Final score combines both approaches
-                final_score = 0.7 * neural_score + 0.3 * component_score
-                matches.append((addr, max(0.0, min(1.0, final_score))))
+                # Final score combines both approaches with proper normalization
+                neural_score = float(score)  # Base neural score (0-1)
+                component_score = min(1.0, component_score)  # Normalize component score
+                
+                # Weighted combination with bias towards exact matches
+                final_score = (0.7 * neural_score + 0.3 * component_score)
+                
+                # Apply sigmoid-like normalization to keep scores in meaningful range
+                normalized_score = 0.5 + (final_score - 0.5) * 0.3  # Maps to 0.2-0.8 range
+                matches.append((addr, normalized_score))
             
 
         
