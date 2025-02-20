@@ -270,16 +270,29 @@ class AddressMatcher:
         # Use larger batch size for GPU
         batch_size = 512 if torch.cuda.is_available() else 64
         
-        # First filter by postal code and city for better matches
-        filtered_matches = [
+        # First try exact matches
+        exact_matches = [
             addr for addr in self.reference_data 
-            if (addr['nPLZ'] == postal_code or 
-                self._partial_match(addr['cOrtsname'].lower(), city.lower()))
+            if addr['nPLZ'] == postal_code and 
+               addr['cOrtsname'].lower() == city.lower() and
+               addr['cStrassenname'].lower() == street.lower()
         ]
         
-        # If no matches found, fall back to all addresses
-        if not filtered_matches:
-            filtered_matches = self.reference_data
+        # If no exact matches, try partial matches
+        if exact_matches:
+            filtered_matches = exact_matches
+        else:
+            # Filter by postal code and city similarity
+            filtered_matches = [
+                addr for addr in self.reference_data 
+                if (addr['nPLZ'] == postal_code or 
+                    self._partial_match(addr['cOrtsname'].lower(), city.lower()) or
+                    self._partial_match(addr['cStrassenname'].lower(), street.lower()))
+            ]
+            
+            # If still no matches, use all addresses
+            if not filtered_matches:
+                filtered_matches = self.reference_data
         
         for i in tqdm(range(0, len(filtered_matches), batch_size), desc="Finding matches"):
             batch = filtered_matches[i:i + batch_size]
@@ -346,14 +359,24 @@ class AddressMatcher:
                 neural_score = float(score)  # Base neural score (0-1)
                 component_score = min(1.0, component_score)  # Normalize component score
                 
-                # Weighted combination with stronger bias towards exact matches
-                final_score = (0.4 * neural_score + 0.6 * component_score)
+                # Check for exact match
+                is_exact = (
+                    addr['nPLZ'] == postal_code and
+                    addr['cOrtsname'].lower() == city.lower() and
+                    addr['cStrassenname'].lower() == street.lower()
+                )
                 
-                # Apply stronger normalization for better score distribution
-                if component_score > 0.9:  # Exact or near-exact match
-                    normalized_score = 0.8 + (final_score * 0.2)  # Maps to 0.8-1.0
+                if is_exact:
+                    normalized_score = 1.0  # Perfect match
                 else:
-                    normalized_score = 0.3 + (final_score * 0.5)  # Maps to 0.3-0.8
+                    # Weighted combination with stronger bias towards component matches
+                    final_score = (0.3 * neural_score + 0.7 * component_score)
+                    
+                    # Normalize based on match quality
+                    if component_score > 0.8:  # Strong partial match
+                        normalized_score = 0.7 + (final_score * 0.2)  # Maps to 0.7-0.9
+                    else:
+                        normalized_score = 0.3 + (final_score * 0.4)  # Maps to 0.3-0.7
                 matches.append((addr, normalized_score))
             
 
