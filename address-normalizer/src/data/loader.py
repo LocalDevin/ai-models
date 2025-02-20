@@ -27,7 +27,8 @@ class AddressLoader:
     
     def __iter__(self) -> Generator[Dict[str, str], None, None]:
         """Yield address records efficiently using memory mapping."""
-        # Get total file size for progress bar
+        # Reset memory map position and get total size
+        self.mm.seek(0)
         total_size = self.file_path.stat().st_size
         processed = 0
         
@@ -59,12 +60,14 @@ class AddressLoader:
     def load_full(self) -> pd.DataFrame:
         """Load entire dataset efficiently using memory mapping."""
         try:
+            # Reset memory map position
+            self.mm.seek(0)
+            
             # Use a more memory-efficient approach for full loading
             df = pd.read_csv(
                 self.mm,
                 delimiter=';',
                 dtype={'nPLZ': str},
-                memory_map=True,  # Use memory mapping
                 low_memory=True   # More memory-efficient at cost of some speed
             )
             

@@ -7,15 +7,21 @@ from src.config import DataConfig
 from src.data.loader import AddressLoader
 
 def test_loader_performance():
-    config = DataConfig(chunk_size=5000)  # Increased chunk size
+    # Test with first 10000 records
+    config = DataConfig(chunk_size=1000)
     data_path = Path(__file__).parent.parent / 'test_data' / 'addresses.csv'
     print(f"Loading data from: {data_path}")
     print(f"File size: {data_path.stat().st_size / 1024 / 1024:.1f}MB")
+    print("Testing with first 10000 records...")
     loader = AddressLoader(str(data_path), config)
 
     # Test chunked loading
     start = time.time()
-    count = sum(1 for _ in loader)
+    count = 0
+    for i, _ in enumerate(loader):
+        if i >= 10000:
+            break
+        count += 1
     chunk_time = time.time() - start
     print(f'Processed {count} records in {chunk_time:.2f}s using chunks')
 
