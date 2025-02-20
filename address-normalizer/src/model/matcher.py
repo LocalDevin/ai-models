@@ -361,17 +361,27 @@ class AddressMatcher:
         return str1 == str2 or str1 in str2 or str2 in str1
         
     def save_model(self, model_name: str = "latest") -> None:
-        """Save trained model and embeddings cache."""
+        """Save trained model and embeddings cache with language support."""
         model_path = self.model_dir / f"{model_name}.pt"
         cache_path = self.model_dir / f"{model_name}_cache.pkl"
         reference_path = self.model_dir / f"{model_name}_reference.pkl"
         
+        # Create model directory if it doesn't exist
+        self.model_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save model state with language information
         torch.save({
             'network_state': self.network.state_dict(),
             'language': self.language,
-            'model_name': model_name
+            'model_name': model_name,
+            'embedding_model': SUPPORTED_LANGUAGES[self.language]['embedding_model'],
+            'config': {
+                'model': self.model_config.__dict__,
+                'data': self.data_config.__dict__
+            }
         }, model_path)
         
+        # Save cache and reference data
         with open(cache_path, 'wb') as f:
             pickle.dump(self.embeddings_cache, f)
             
@@ -379,7 +389,7 @@ class AddressMatcher:
             pickle.dump(self.reference_data, f)
             
     def load_model(self, model_name: str = "latest") -> None:
-        """Load trained model and embeddings cache."""
+        """Load trained model with language validation."""
         model_path = self.model_dir / f"{model_name}.pt"
         cache_path = self.model_dir / f"{model_name}_cache.pkl"
         reference_path = self.model_dir / f"{model_name}_reference.pkl"
@@ -387,10 +397,20 @@ class AddressMatcher:
         if not model_path.exists():
             raise FileNotFoundError(f"No saved model found at {model_path}")
         
+        # Load and validate model
         checkpoint = torch.load(model_path)
         if checkpoint['language'] != self.language:
             raise ValueError(f"Model language {checkpoint['language']} doesn't match current language {self.language}")
+        if checkpoint['embedding_model'] != SUPPORTED_LANGUAGES[self.language]['embedding_model']:
+            raise ValueError("Embedding model mismatch")
+            
+        # Update configurations if available
+        if 'config' in checkpoint:
+            self.model_config = ModelConfig(**checkpoint['config']['model'])
+            self.data_config = DataConfig(**checkpoint['config']['data'])
         
+        # Load model state and data
+        self.network = SiameseNetwork(self.model_config).to(self.device)
         self.network.load_state_dict(checkpoint['network_state'])
         
         if cache_path.exists():
