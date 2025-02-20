@@ -16,13 +16,15 @@ def main():
 
     # Initialize matcher with optimal device
     device = args.device or ('cuda' if torch.cuda.is_available() else 'cpu')
-    matcher = AddressMatcher(device)
+    matcher = AddressMatcher(language="DE", device=device)
     
     # Configure training parameters
     train_config = TrainingConfig(
         num_epochs=args.epochs,
         learning_rate=0.001,
-        early_stopping_patience=5
+        early_stopping_patience=5,
+        batch_size=args.batch_size,
+        num_workers=args.workers
     )
     
     data_config = DataConfig(
