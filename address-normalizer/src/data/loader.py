@@ -42,11 +42,14 @@ class AddressLoader:
             nrows=self.sample_size
         )
         
-        with tqdm(total=total_size, desc="Loading addresses") as pbar:
+        with tqdm(total=self.sample_size if self.sample_size else None, desc="Loading addresses") as pbar:
             for chunk in df_iter:
-                chunk_size = chunk.memory_usage(deep=True).sum()
-                processed += chunk_size
-                pbar.update(chunk_size)
+                for _ in chunk.iterrows():
+                    if self.sample_size and records_yielded >= self.sample_size:
+                        pbar.close()
+                        return
+                    records_yielded += 1
+                    pbar.update(1)
                 
                 if processed % (100 * 1024 * 1024) == 0:  # Log every 100MB
                     mem = psutil.Process().memory_info()
