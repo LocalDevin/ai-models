@@ -258,10 +258,16 @@ class AddressMatcher:
         # Use larger batch size for GPU
         batch_size = 512 if torch.cuda.is_available() else 64
         
-        # First filter by postal code for efficiency
-        postal_matches = [addr for addr in self.reference_data if addr['nPLZ'] == postal_code]
-        if not postal_matches:
-            postal_matches = self.reference_data  # Fallback to all addresses
+        # First filter by postal code and city for better matches
+        filtered_matches = [
+            addr for addr in self.reference_data 
+            if (addr['nPLZ'] == postal_code or 
+                self._partial_match(addr['cOrtsname'].lower(), city.lower()))
+        ]
+        
+        # If no matches found, fall back to all addresses
+        if not filtered_matches:
+            filtered_matches = self.reference_data
         
         for i in tqdm(range(0, len(postal_matches), batch_size), desc="Finding matches"):
             batch = postal_matches[i:i + batch_size]
@@ -335,8 +341,17 @@ class AddressMatcher:
         return matches[:k]
     
     def _partial_match(self, str1: str, str2: str) -> bool:
-        """Check if strings partially match."""
-        return str1 in str2 or str2 in str1
+        """Check if strings partially match, handling common variations."""
+        # Normalize strings
+        str1 = str1.lower().replace('ß', 'ss').replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue')
+        str2 = str2.lower().replace('ß', 'ss').replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue')
+        
+        # Handle common abbreviations
+        str1 = str1.replace('str.', 'strasse').replace('str ', 'strasse ')
+        str2 = str2.replace('str.', 'strasse').replace('str ', 'strasse ')
+        
+        # Check for exact or partial matches
+        return str1 == str2 or str1 in str2 or str2 in str1
         
     def save_model(self, model_name: str = "latest") -> None:
         """Save trained model and embeddings cache."""
