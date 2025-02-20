@@ -59,7 +59,11 @@ class AddressMatcher:
             raise ValueError(f"Unsupported language: {language}. Supported: {list(SUPPORTED_LANGUAGES.keys())}")
         
         self.language = language
-        self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
+        # Validate device availability
+        requested_device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = 'cuda' if requested_device == 'cuda' and torch.cuda.is_available() else 'cpu'
+        if requested_device == 'cuda' and not torch.cuda.is_available():
+            print("Warning: CUDA requested but not available. Using CPU instead.")
         print(f"Using device: {self.device}")
         
         # Initialize components with language-specific settings
