@@ -282,34 +282,42 @@ class AddressMatcher:
         if exact_matches:
             filtered_matches = exact_matches
         else:
-            # First try exact postal code matches
-            postal_matches = [
+            # First try exact matches
+            exact_matches = [
                 addr for addr in self.reference_data 
-                if addr['nPLZ'] == postal_code
+                if (addr['nPLZ'] == postal_code and
+                    self._partial_match(addr['cOrtsname'].lower(), city.lower()) > 0.9 and
+                    self._partial_match(addr['cStrassenname'].lower(), street.lower()) > 0.9)
             ]
             
-            # If we have postal matches, filter by city and street similarity
-            if postal_matches:
-                filtered_matches = []
-                for addr in postal_matches:
-                    city_match = self._partial_match(addr['cOrtsname'].lower(), city.lower())
-                    street_match = self._partial_match(addr['cStrassenname'].lower(), street.lower())
-                    
-                    # Strong city and street match
-                    if city_match > 0.8 and street_match > 0.8:
-                        filtered_matches.append(addr)
-                    # Good city match with decent street match
-                    elif city_match > 0.9 and street_match > 0.5:
-                        filtered_matches.append(addr)
-                    # Good street match with decent city match
-                    elif street_match > 0.9 and city_match > 0.5:
-                        filtered_matches.append(addr)
+            if exact_matches:
+                filtered_matches = exact_matches
             else:
-                # Try city matches if no postal matches
-                filtered_matches = [
-                    addr for addr in self.reference_data
-                    if self._partial_match(addr['cOrtsname'].lower(), city.lower()) > 0.9
+                # Try postal code matches with high similarity
+                postal_matches = [
+                    addr for addr in self.reference_data 
+                    if addr['nPLZ'] == postal_code
                 ]
+                
+                if postal_matches:
+                    filtered_matches = []
+                    for addr in postal_matches:
+                        city_match = self._partial_match(addr['cOrtsname'].lower(), city.lower())
+                        street_match = self._partial_match(addr['cStrassenname'].lower(), street.lower())
+                        
+                        # Add if either city or street has high similarity
+                        if city_match > 0.8 or street_match > 0.8:
+                            filtered_matches.append(addr)
+                else:
+                    # Fall back to high city similarity matches
+                    filtered_matches = [
+                        addr for addr in self.reference_data
+                        if self._partial_match(addr['cOrtsname'].lower(), city.lower()) > 0.9
+                    ]
+            
+            # If no matches found, use all addresses
+            if not filtered_matches:
+                filtered_matches = self.reference_data[:10]  # Limit to top 10 for efficiency
             
             # If still no matches, use all addresses
             if not filtered_matches:
