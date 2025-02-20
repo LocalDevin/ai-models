@@ -346,11 +346,14 @@ class AddressMatcher:
                 neural_score = float(score)  # Base neural score (0-1)
                 component_score = min(1.0, component_score)  # Normalize component score
                 
-                # Weighted combination with bias towards exact matches
-                final_score = (0.7 * neural_score + 0.3 * component_score)
+                # Weighted combination with stronger bias towards exact matches
+                final_score = (0.4 * neural_score + 0.6 * component_score)
                 
-                # Apply sigmoid-like normalization to keep scores in meaningful range
-                normalized_score = 0.5 + (final_score - 0.5) * 0.3  # Maps to 0.2-0.8 range
+                # Apply stronger normalization for better score distribution
+                if component_score > 0.9:  # Exact or near-exact match
+                    normalized_score = 0.8 + (final_score * 0.2)  # Maps to 0.8-1.0
+                else:
+                    normalized_score = 0.3 + (final_score * 0.5)  # Maps to 0.3-0.8
                 matches.append((addr, normalized_score))
             
 
