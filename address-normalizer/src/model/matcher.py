@@ -118,8 +118,14 @@ class AddressMatcher:
         gc.collect()  # Free memory
         print(f"Loaded {len(self.reference_data)} addresses for language {self.language}")
     
-    def train(self, data_path: str, config: TrainingConfig) -> Dict[str, float]:
-        """Train the network with mixed precision and GPU optimization."""
+    def train(self, data_path: str, config: TrainingConfig, sample_size: Optional[int] = 10000) -> Dict[str, float]:
+        """Train the network with mixed precision and GPU optimization.
+        
+        Args:
+            data_path: Path to training data
+            config: Training configuration
+            sample_size: Maximum number of addresses to load (default: 10000)
+        """
         print("\nStarting training...")
         train_data = [
             # Basic street variations
