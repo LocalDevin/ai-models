@@ -41,12 +41,16 @@ class DataConfig:
 
 @dataclass
 class ModelConfig:
-    embedding_dim: int = 384
-    hidden_dim: int = 256
-    dropout: float = 0.3
+    embedding_dim: int = 384  # Matches sentence transformer output
+    hidden_dim: int = 512     # Increased for better feature extraction
+    dropout: float = 0.2      # Adjusted for better generalization
+    learning_rate: float = 0.001
+    weight_decay: float = 0.01
 
 @dataclass
 class TrainingConfig:
-    learning_rate: float = 0.001
     num_epochs: int = 50
+    learning_rate: float = 0.001
     early_stopping_patience: int = 5
+    batch_size: int = 64      # Per-language batch size
+    num_workers: int = 4      # Per-language worker count
