@@ -28,25 +28,27 @@ class AddressLoader:
     
     def __iter__(self) -> Generator[Dict[str, str], None, None]:
         """Yield address records efficiently using memory mapping."""
-        # Reset memory map position and get total size
+        # Reset memory map position
         self.mm.seek(0)
-        total_size = self.file_path.stat().st_size
-        processed = 0
         records_yielded = 0
         
+        # Configure chunk size based on sample size
+        chunk_size = min(self.config.chunk_size, self.sample_size if self.sample_size else self.config.chunk_size)
+        
+        # Read data in chunks
         df_iter = pd.read_csv(
             self.mm, 
             delimiter=';',
-            chunksize=min(self.config.chunk_size, self.sample_size if self.sample_size else self.config.chunk_size),
+            chunksize=chunk_size,
             dtype={'nPLZ': str},
             nrows=self.sample_size
         )
         
-        with tqdm(total=self.sample_size if self.sample_size else None, desc="Loading addresses") as pbar:
+        # Process chunks with progress tracking
+        with tqdm(total=self.sample_size, desc="Loading addresses", unit="records") as pbar:
             for chunk in df_iter:
                 for _, row in chunk.iterrows():
                     if self.sample_size and records_yielded >= self.sample_size:
-                        pbar.close()
                         return
                     
                     addr = {
