@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -5,9 +6,10 @@ from typing import Optional
 class DataConfig:
     chunk_size: int = 10000
     max_pairs_per_group: int = 10
-    num_workers: int = 4
-    batch_size: int = 64
+    num_workers: int = min(8, os.cpu_count() or 4)  # Optimize for available CPUs
+    batch_size: int = 128  # Increased for better GPU utilization
     pin_memory: bool = True
+    prefetch_factor: int = 2  # Prefetch batches for better throughput
 
 @dataclass
 class ModelConfig:

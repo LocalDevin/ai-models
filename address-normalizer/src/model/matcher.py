@@ -142,16 +142,25 @@ class AddressMatcher:
         if len(dataset) == 0:
             raise ValueError("Dataset generated 0 training pairs")
             
+        # Configure batch size based on device
+        effective_batch_size = 256 if torch.cuda.is_available() else 64
+        
         train_loader = DataLoader(
             dataset,
-            batch_size=self.data_config.batch_size,
+            batch_size=effective_batch_size,
             shuffle=True,
             num_workers=self.data_config.num_workers,
-            pin_memory=self.data_config.pin_memory and self.device == 'cuda'
+            pin_memory=self.data_config.pin_memory and self.device == 'cuda',
+            prefetch_factor=self.data_config.prefetch_factor,
+            persistent_workers=True  # Keep workers alive between epochs
         )
         
-        # Initialize optimizer
-        optimizer = optim.AdamW(self.network.parameters(), lr=config.learning_rate)
+        # Initialize optimizer with larger learning rate for GPU
+        lr = config.learning_rate * 2.0 if torch.cuda.is_available() else config.learning_rate
+        optimizer = optim.AdamW(self.network.parameters(), lr=lr, weight_decay=0.01)
+        
+        # Initialize gradient scaler for mixed precision training
+        scaler = GradScaler(enabled=torch.cuda.is_available())
         
         # Training loop
         best_loss = float('inf')
@@ -218,13 +227,18 @@ class AddressMatcher:
         query_embedding = torch.tensor(self.embeddings_cache[query], dtype=torch.float32).to(self.device)
         
         matches = []
-        # Process in batches for memory efficiency
-        batch_size = 1000
-        for i in tqdm(range(0, len(self.reference_data), batch_size), desc="Finding matches"):
-            batch = self.reference_data[i:i + batch_size]
+        # Use larger batch size for GPU
+        batch_size = 512 if torch.cuda.is_available() else 64
+        
+        # First filter by postal code for efficiency
+        postal_matches = [addr for addr in self.reference_data if addr['nPLZ'] == postal_code]
+        if not postal_matches:
+            postal_matches = self.reference_data  # Fallback to all addresses
+        
+        for i in tqdm(range(0, len(postal_matches), batch_size), desc="Finding matches"):
+            batch = postal_matches[i:i + batch_size]
             
-            # Get cached embeddings for batch
-            # Process batch embeddings efficiently
+            # Process missing embeddings in batch
             missing_addrs = [addr for addr in batch if addr['full_address'] not in self.embeddings_cache]
             if missing_addrs:
                 with torch.autocast(device_type=self.device):
@@ -233,43 +247,55 @@ class AddressMatcher:
                     for addr, emb in zip(missing_addrs, missing_embeddings):
                         self.embeddings_cache[addr['full_address']] = emb
             
-            # Convert to tensor efficiently using numpy
-            batch_embeddings = np.array([self.embeddings_cache[addr['full_address']] for addr in batch])
-            batch_embeddings = torch.from_numpy(batch_embeddings).float().to(self.device)
+            # Convert to tensor efficiently using stack
+            batch_embeddings = torch.stack([
+                torch.tensor(self.embeddings_cache[addr['full_address']], device=self.device)
+                for addr in batch
+            ])
             
+            # Skip empty batches
+            if not batch:
+                continue
+                
             # Calculate similarity scores in batch
             with torch.no_grad():
                 with torch.autocast(device_type=self.device):
-                    base_scores = self.network(
-                        query_embedding.unsqueeze(0).expand(len(batch), -1),
-                        batch_embeddings
-                    ).squeeze()
+                    # Expand query embedding to match batch size
+                    query_batch = query_embedding.unsqueeze(0).expand(len(batch), -1)
+                    
+                    # Get similarity scores
+                    similarity, _ = self.network.predict_similarity(query_batch, batch_embeddings)
+                    base_scores = similarity.squeeze(-1)  # Keep batch dimension
             
-            # Convert scores to float32 before processing
+            # Convert scores to float32 and move to CPU
             base_scores = base_scores.to(torch.float32).cpu().numpy()
+            if len(base_scores.shape) == 0:  # Handle single score
+                base_scores = base_scores.reshape(1)
             
             # Process each address in the batch
             for score, addr in zip(base_scores, batch):
-                # Apply weights based on exact and partial matches
-                multiplier = 1.0
+                # Calculate component-wise similarity scores
+                postal_match = 1.0 if addr['nPLZ'] == postal_code else 0.0
                 
-                # Apply weights multiplicatively
-                if addr['nPLZ'] == postal_code:
-                    multiplier *= ZIP_WEIGHT
+                city_match = 1.0 if addr['cOrtsname'].lower() == city.lower() else (
+                    0.8 if self._partial_match(addr['cOrtsname'].lower(), city.lower()) else 0.0
+                )
                 
-                if addr['cOrtsname'].lower() == city.lower():
-                    multiplier *= CITY_WEIGHT
-                elif self._partial_match(addr['cOrtsname'].lower(), city.lower()):
-                    multiplier *= CITY_WEIGHT * 0.8  # Partial match
+                street_match = 1.0 if addr['cStrassenname'].lower() == street.lower() else (
+                    0.8 if self._partial_match(addr['cStrassenname'].lower(), street.lower()) else 0.0
+                )
                 
-                if addr['cStrassenname'].lower() == street.lower():
-                    multiplier *= STREET_WEIGHT
-                elif self._partial_match(addr['cStrassenname'].lower(), street.lower()):
-                    multiplier *= STREET_WEIGHT * 0.8  # Partial match
+                # Weighted combination of neural and rule-based scores
+                neural_score = float(score)
+                component_score = (
+                    postal_match * ZIP_WEIGHT +
+                    city_match * CITY_WEIGHT +
+                    street_match * STREET_WEIGHT
+                ) / (ZIP_WEIGHT + CITY_WEIGHT + STREET_WEIGHT)
                 
-                # Apply multiplier and normalize
-                final_score = min(1.0, float(score * multiplier))
-                matches.append((addr, final_score))
+                # Final score combines both approaches
+                final_score = 0.7 * neural_score + 0.3 * component_score
+                matches.append((addr, max(0.0, min(1.0, final_score))))
             
 
         
