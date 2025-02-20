@@ -1,6 +1,34 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+import os
 from typing import Optional
+
+# Constants for paths and language support
+MODELS_DIR = Path("models")
+TEST_DATA_DIR = Path("test_data")
+
+# Language-specific configurations
+SUPPORTED_LANGUAGES = {
+    "DE": {
+        "name": "German",
+        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "test_data": ["addresses.csv", "test_cases.csv"]
+    },
+    "EN": {
+        "name": "English",
+        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "test_data": ["addresses.csv", "test_cases.csv"]
+    }
+}
+DEFAULT_LANGUAGE = "DE"
+
+@dataclass
+class LanguageConfig:
+    code: str = DEFAULT_LANGUAGE
+    test_data_path: Path = TEST_DATA_DIR / DEFAULT_LANGUAGE
+    model_path: Path = MODELS_DIR / DEFAULT_LANGUAGE
+    embedding_model: str = SUPPORTED_LANGUAGES[DEFAULT_LANGUAGE]["embedding_model"]
 
 @dataclass
 class DataConfig:
