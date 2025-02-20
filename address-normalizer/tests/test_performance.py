@@ -59,10 +59,10 @@ def test_performance():
     
     # Test with small dataset
     print("\nTesting with small dataset...")
-    matcher_small = AddressMatcher()
+    matcher_small = AddressMatcher(language="DE")
     train_config = TrainingConfig(num_epochs=2)
     metrics_small = PerformanceMetrics.measure_training(
-        matcher_small, 'test_data/sample.csv', train_config
+        matcher_small, 'test_data/DE/sample.csv', train_config
     )
     
     inference_small = PerformanceMetrics.measure_inference(
@@ -81,9 +81,9 @@ def test_performance():
     
     # Test with medium dataset
     print("\nTesting with medium dataset...")
-    matcher_medium = AddressMatcher()
+    matcher_medium = AddressMatcher(language="DE")
     metrics_medium = PerformanceMetrics.measure_training(
-        matcher_medium, 'test_data/medium.csv', train_config
+        matcher_medium, 'test_data/DE/medium.csv', train_config
     )
     
     inference_medium = PerformanceMetrics.measure_inference(

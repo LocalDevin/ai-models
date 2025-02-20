@@ -9,8 +9,8 @@ def test_address_matching():
     print('\nTesting address matching...\n')
     
     # Initialize matcher with test data
-    matcher = AddressMatcher()
-    matcher.initialize_database('test_data/test_cases.csv')
+    matcher = AddressMatcher(language="DE")
+    matcher.initialize_database('test_data/DE/test_cases.csv')
     
     # Test cases
     test_pairs = [
