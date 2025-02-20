@@ -406,18 +406,39 @@ class AddressMatcher:
         matches.sort(key=lambda x: (-x[1], x[0]['full_address']))  # Sort by score desc, then address asc
         return matches[:k]
     
-    def _partial_match(self, str1: str, str2: str) -> bool:
-        """Check if strings partially match, handling common variations."""
+    def _partial_match(self, str1: str, str2: str) -> float:
+        """Enhanced string matching with German address handling."""
         # Normalize strings
-        str1 = str1.lower().replace('ß', 'ss').replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue')
-        str2 = str2.lower().replace('ß', 'ss').replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue')
+        str1 = str1.lower().strip()
+        str2 = str2.lower().strip()
         
-        # Handle common abbreviations
-        str1 = str1.replace('str.', 'strasse').replace('str ', 'strasse ')
-        str2 = str2.replace('str.', 'strasse').replace('str ', 'strasse ')
+        # Handle German characters and abbreviations
+        replacements = {
+            'ß': 'ss', 'ä': 'ae', 'ö': 'oe', 'ü': 'ue',
+            'str.': 'strasse', 'str ': 'strasse ',
+            'straße': 'strasse', 'platz': 'pl.',
+            'a.m.': 'am main', 'a. m.': 'am main'
+        }
         
-        # Check for exact or partial matches
-        return str1 == str2 or str1 in str2 or str2 in str1
+        for old, new in replacements.items():
+            str1 = str1.replace(old, new)
+            str2 = str2.replace(old, new)
+        
+        # Exact match after normalization
+        if str1 == str2:
+            return 1.0
+        
+        # One string contains the other
+        if str1 in str2 or str2 in str1:
+            return 0.9
+        
+        # Calculate similarity based on common prefix
+        min_len = min(len(str1), len(str2))
+        for i in range(min_len):
+            if str1[i] != str2[i]:
+                return i / min_len if i > 0 else 0.0
+        
+        return min_len / max(len(str1), len(str2))
         
     def save_model(self, model_name: str = "latest") -> None:
         """Save trained model and embeddings cache with language support."""
