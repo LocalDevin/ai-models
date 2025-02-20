@@ -380,24 +380,31 @@ class AddressMatcher:
                 neural_score = float(score)  # Base neural score (0-1)
                 component_score = min(1.0, component_score)  # Normalize component score
                 
-                # Check for exact match
-                is_exact = (
-                    addr['nPLZ'] == postal_code and
-                    addr['cOrtsname'].lower() == city.lower() and
-                    addr['cStrassenname'].lower() == street.lower()
-                )
+                # Calculate component-wise scores
+                postal_score = 1.0 if addr['nPLZ'] == postal_code else 0.0
+                city_score = self._partial_match(addr['cOrtsname'].lower(), city.lower())
+                street_score = self._partial_match(addr['cStrassenname'].lower(), street.lower())
                 
-                if is_exact:
-                    normalized_score = 1.0  # Perfect match
+                # Weight the components
+                weights = SUPPORTED_LANGUAGES[self.language]['weights']
+                component_score = (
+                    weights['zip'] * postal_score +
+                    weights['city'] * city_score +
+                    weights['street'] * street_score
+                ) / sum(weights.values())
+                
+                # Perfect match
+                if postal_score == 1.0 and city_score == 1.0 and street_score == 1.0:
+                    normalized_score = 1.0
+                # Strong match (exact postal + high city/street similarity)
+                elif postal_score == 1.0 and (city_score > 0.8 or street_score > 0.8):
+                    normalized_score = 0.8 + (component_score * 0.2)  # Maps to 0.8-1.0
+                # Moderate match
+                elif component_score > 0.6:
+                    normalized_score = 0.6 + (component_score * 0.2)  # Maps to 0.6-0.8
+                # Weak match
                 else:
-                    # Weighted combination with stronger bias towards component matches
-                    final_score = (0.3 * neural_score + 0.7 * component_score)
-                    
-                    # Normalize based on match quality
-                    if component_score > 0.8:  # Strong partial match
-                        normalized_score = 0.7 + (final_score * 0.2)  # Maps to 0.7-0.9
-                    else:
-                        normalized_score = 0.3 + (final_score * 0.4)  # Maps to 0.3-0.7
+                    normalized_score = max(0.3, component_score)  # Maps to 0.3-0.6
                 matches.append((addr, normalized_score))
             
 
