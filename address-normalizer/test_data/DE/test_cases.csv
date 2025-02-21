@@ -1,7 +1,11 @@
 nPLZ;cOrtsname;cStrassenname
+12345;Berlin;Hauptstraße
+80331;München;Marienplatz
+80331;Muenchen;Marienplatz
+12345;Berlin;Hauptstr.
+60313;Frankfurt a.M.;Zeil
+70173;Stuttgart;Königstraße
+70173;Stuttgart;Koenigstrasse
 75446;Wiernshem;Lerchenweg
 75446;Wiernsheim;Lerchenveg
 10001;NYC;Fifth Avenue
-12345;Berlin;Hauptstr.
-80331;Muenchen;Marienplatz
-60313;Frankfurt;Zeil Str.

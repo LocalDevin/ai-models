@@ -18,7 +18,7 @@ from ..data.loader import AddressLoader
 from .network import SiameseNetwork
 
 # Constants for model persistence and language support
-MODELS_DIR = Path("models")
+MODELS_DIR = Path("models").resolve()
 SUPPORTED_LANGUAGES = {
     "DE": {
         "name": "German",
@@ -115,7 +115,7 @@ class AddressMatcher:
         gc.collect()  # Free memory
         print(f"Loaded {len(self.reference_data)} addresses for language {self.language}")
     
-    def train(self, data_path: str, config: TrainingConfig, sample_size: Optional[int] = 10000) -> Dict[str, float]:
+    def train(self, data_path: str, config: TrainingConfig, sample_size: Optional[int] = 10000) -> Dict[str, List[float]]:
         """Train the network with mixed precision and GPU optimization.
         
         Args:
@@ -124,46 +124,17 @@ class AddressMatcher:
             sample_size: Maximum number of addresses to load (default: 10000)
         """
         print("\nStarting training...")
-        train_data = [
-            # Basic street variations
-            ("12345 Berlin Hauptstraße", "12345 Berlin Hauptstrasse", 1),
-            ("12345 Berlin Hauptstraße", "12345 Berlin Hauptstr.", 1),
-            ("12345 Berlin Hauptstr", "12345 Berlin Hauptstrasse", 1),
+        # Load training pairs from CSV
+        training_pairs_path = Path("test_data") / self.language / "training_pairs.csv"
+        if not training_pairs_path.exists():
+            raise FileNotFoundError(f"No training pairs found at {training_pairs_path}")
             
-            # City name variations
-            ("60313 Frankfurt am Main Zeil", "60313 Frankfurt a.M. Zeil", 1),
-            ("60313 Frankfurt/Main Zeil", "60313 Frankfurt Zeil", 1),
-            ("60313 Frankfurt a.M. Zeil", "60313 Frankfurt/M Zeil", 1),
-            ("60313 Frankfurt/Main Zeil", "60313 Ffm Zeil", 1),
-            
-            # Special German characters
-            ("70173 Stuttgart Königstraße", "70173 Stuttgart Koenigstrasse", 1),
-            ("80331 München Marienplatz", "80331 Muenchen Marienplatz", 1),
-            ("79539 Lörrach Hauptstraße", "79539 Loerrach Hauptstr.", 1),
-            ("12345 Köln Höhenberger Str.", "12345 Koeln Hoehenberger Str.", 1),
-            
-            # Common abbreviations and variations
-            ("10178 Berlin Alexanderplatz", "10178 Berlin Alex.-Pl.", 1),
-            ("10178 Berlin Alexanderpl.", "10178 Berlin Alexander-Platz", 1),
-            ("10117 Berlin Unter den Linden", "10117 Berlin U.d. Linden", 1),
-            ("12345 Hamburg Sankt Georg", "12345 Hamburg St. Georg", 1),
-            ("12345 Berlin Karl-Marx-Str.", "12345 Berlin Karl Marx Strasse", 1),
-            ("12345 Berlin An der Spree", "12345 Berlin a.d. Spree", 1),
-            ("12345 Berlin Vor dem Tor", "12345 Berlin v.d. Tor", 1),
-            
-            # Directional variations
-            ("12345 Berlin Nord", "12345 Berlin-N", 1),
-            ("12345 Berlin Süd", "12345 Berlin-S", 1),
-            ("12345 Berlin West", "12345 Berlin-W", 1),
-            ("12345 Berlin Ost", "12345 Berlin-O", 1),
-            
-            # Negative examples (different addresses)
-            ("10115 Berlin Invalidenstraße", "10117 Berlin Friedrichstraße", 0),
-            ("60313 Frankfurt Zeil", "80331 München Kaufingerstraße", 0),
-            ("70173 Stuttgart Königstraße", "70174 Stuttgart Calwerstraße", 0),
-            ("12345 Berlin-Nord", "12345 Berlin-Süd", 0),
-            ("12345 Hamburg St. Pauli", "12345 Hamburg St. Georg", 0)
-        ]
+        train_df = pd.read_csv(training_pairs_path, delimiter=';', dtype={'nPLZ': str, 'match_nPLZ': str})
+        train_data = []
+        for _, row in train_df.iterrows():
+            addr1 = f"{row['nPLZ']} {row['cOrtsname']} {row['cStrassenname']}"
+            addr2 = f"{row['match_nPLZ']} {row['match_cOrtsname']} {row['match_cStrassenname']}"
+            train_data.append((addr1, addr2, row['is_match']))
         
         # Load data if path provided
         if data_path:
@@ -455,12 +426,21 @@ class AddressMatcher:
         
         return min_len / max(len(str1), len(str2))
         
-    def save_model(self, model_name: str = "latest") -> None:
-        """Save trained model and embeddings cache with language support."""
+    def save_model(self, model_name: str = "latest", overwrite: bool = False) -> None:
+        """Save trained model and embeddings cache with language support.
+        
+        Args:
+            model_name: Name of the model to save
+            overwrite: If True, overwrite existing model files. If False, raise FileExistsError when files exist.
+        """
         model_path = self.model_dir / f"{model_name}.pt"
         cache_path = self.model_dir / f"{model_name}_cache.pkl"
         reference_path = self.model_dir / f"{model_name}_reference.pkl"
         
+        # Check for existing files if overwrite is False
+        if not overwrite and (model_path.exists() or cache_path.exists() or reference_path.exists()):
+            raise FileExistsError(f"Model files for {model_name} already exist. Use overwrite=True to replace.")
+            
         # Create model directory if it doesn't exist
         self.model_dir.mkdir(parents=True, exist_ok=True)
         
