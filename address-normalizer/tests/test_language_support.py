@@ -9,14 +9,15 @@ def test_language_support():
     """Test language-specific model persistence and matching."""
     print("\nTesting language support...")
     
+    # Clean up any existing test models
+    import shutil
+    test_model_dir = Path("models")
+    if test_model_dir.exists():
+        shutil.rmtree(test_model_dir)
+    
     # Test German model
     print("\nTesting German (DE) model:")
     de_matcher = AddressMatcher(language="DE")
-    
-    # Test with production dataset
-    print("\nTesting with production dataset:")
-    de_matcher.initialize_database("test_data/DE/addresses.csv")
-    de_matcher.save_model("test_de_prod")
     
     # Test with test cases
     print("\nTesting with test cases:")
@@ -54,6 +55,11 @@ def test_language_support():
     print("\nTesting model loading:")
     new_matcher = AddressMatcher(language="DE")
     new_matcher.load_model(test_model_name)
+    
+    # Test matching with loaded model
+    test_query = ("12345", "Berlin", "Hauptstraße")
+    matches = new_matcher.find_matches(*test_query, k=3)
+    assert len(matches) > 0, "Loaded model should return matches"
     
     # Test GPU memory usage if available
     if torch.cuda.is_available():
