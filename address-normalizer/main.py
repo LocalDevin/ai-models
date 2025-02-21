@@ -12,17 +12,20 @@ def main():
     parser.add_argument('--epochs', type=int, default=50, help='Number of training epochs')
     parser.add_argument('--workers', type=int, default=4, help='Number of worker processes')
     parser.add_argument('--device', type=str, default=None, help='Device to use (cuda/cpu)')
+    parser.add_argument('--sample-size', type=int, default=10000, help='Maximum number of addresses to load')
     args = parser.parse_args()
 
     # Initialize matcher with optimal device
     device = args.device or ('cuda' if torch.cuda.is_available() else 'cpu')
-    matcher = AddressMatcher(device)
+    matcher = AddressMatcher(language="DE", device=device)
     
     # Configure training parameters
     train_config = TrainingConfig(
         num_epochs=args.epochs,
         learning_rate=0.001,
-        early_stopping_patience=5
+        early_stopping_patience=5,
+        batch_size=args.batch_size,
+        num_workers=args.workers
     )
     
     data_config = DataConfig(
@@ -34,7 +37,7 @@ def main():
     
     # Train the model
     print(f"\nTraining on device: {device}")
-    metrics = matcher.train(args.reference, train_config)
+    metrics = matcher.train(args.reference, train_config, sample_size=args.sample_size)
     
     # Test if test file provided
     if args.test:

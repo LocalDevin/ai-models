@@ -8,9 +8,10 @@ from tqdm import tqdm
 from ..config import DataConfig
 
 class AddressLoader:
-    def __init__(self, file_path: str, config: DataConfig):
+    def __init__(self, file_path: str, config: DataConfig, sample_size: Optional[int] = None):
         self.file_path = Path(file_path).resolve()
         self.config = config
+        self.sample_size = sample_size
         if not self.file_path.exists():
             raise FileNotFoundError(f"File not found: {self.file_path}")
         self._map_file()
@@ -27,35 +28,54 @@ class AddressLoader:
     
     def __iter__(self) -> Generator[Dict[str, str], None, None]:
         """Yield address records efficiently using memory mapping."""
-        # Reset memory map position and get total size
+        # Reset memory map position
         self.mm.seek(0)
-        total_size = self.file_path.stat().st_size
-        processed = 0
+        records_yielded = 0
         
+        # Use larger chunk size for better performance
+        chunk_size = 5000 if self.sample_size is None else min(5000, self.sample_size)
+        
+        # Read data in chunks
         df_iter = pd.read_csv(
             self.mm, 
             delimiter=';',
-            chunksize=self.config.chunk_size,
-            dtype={'nPLZ': str}
+            chunksize=chunk_size,
+            dtype={'nPLZ': str},
+            nrows=self.sample_size
         )
         
-        with tqdm(total=total_size, desc="Loading addresses") as pbar:
+        # Process chunks with progress tracking
+        with tqdm(total=self.sample_size, desc="Loading addresses", unit="records") as pbar:
             for chunk in df_iter:
-                chunk_size = chunk.memory_usage(deep=True).sum()
-                processed += chunk_size
-                pbar.update(chunk_size)
+                # Process entire chunk at once
+                if self.sample_size and records_yielded + len(chunk) > self.sample_size:
+                    # Trim chunk to fit sample size
+                    chunk = chunk.iloc[:(self.sample_size - records_yielded)]
                 
-                if processed % (100 * 1024 * 1024) == 0:  # Log every 100MB
-                    mem = psutil.Process().memory_info()
-                    print(f"\nMemory usage: {mem.rss / 1024 / 1024:.1f}MB")
-                
-                for _, row in chunk.iterrows():
-                    yield {
+                # Convert chunk to records
+                records = [
+                    {
                         'nPLZ': row['nPLZ'],
                         'cOrtsname': row['cOrtsname'],
                         'cStrassenname': row['cStrassenname'],
                         'full_address': f"{row['nPLZ']} {row['cOrtsname']} {row['cStrassenname']}"
                     }
+                    for _, row in chunk.iterrows()
+                ]
+                
+                # Update progress and yield records
+                records_yielded += len(records)
+                pbar.update(len(records))
+                
+                for record in records:
+                    yield record
+                
+                if self.sample_size and records_yielded >= self.sample_size:
+                    return
+                    
+                    if records_yielded % 1000 == 0:  # Log every 1000 records
+                        mem = psutil.Process().memory_info()
+                        print(f"\nMemory usage: {mem.rss / 1024 / 1024:.1f}MB")
     
     def load_full(self) -> pd.DataFrame:
         """Load entire dataset efficiently using memory mapping."""
