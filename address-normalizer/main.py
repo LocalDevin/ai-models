@@ -42,16 +42,15 @@ def main():
     # Test if test file provided
     if args.test:
         print("\nTesting model...")
-        test_data = [
-            ("12345 Berlin Hauptstraße", "12345 Berlin Hauptstrasse"),
-            ("60313 Frankfurt am Main", "60313 Frankfurt a.M."),
-            ("80331 München Marienplatz", "80331 Muenchen Marienplatz")
-        ]
+        import pandas as pd
+        test_df = pd.read_csv(args.test, delimiter=';', dtype={'nPLZ': str})
         
-        for addr1, addr2 in test_data:
-            postal_code = addr1.split()[0]
-            city = addr1.split()[1]
-            street = ' '.join(addr1.split()[2:])
+        for _, row in test_df.iterrows():
+            postal_code = row['nPLZ']
+            city = row['cOrtsname']
+            street = row['cStrassenname']
+            addr1 = f"{postal_code} {city} {street}"
+            
             matches = matcher.find_matches(postal_code, city, street, k=3)
             print(f"\nQuery: {addr1}")
             for addr, score in matches:

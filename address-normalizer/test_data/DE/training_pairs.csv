@@ -1,0 +1,28 @@
+nPLZ;cOrtsname;cStrassenname;match_nPLZ;match_cOrtsname;match_cStrassenname;is_match
+12345;Berlin;Hauptstraße;12345;Berlin;Hauptstrasse;1
+12345;Berlin;Hauptstraße;12345;Berlin;Hauptstr.;1
+12345;Berlin;Hauptstr;12345;Berlin;Hauptstrasse;1
+60313;Frankfurt am Main;Zeil;60313;Frankfurt a.M.;Zeil;1
+60313;Frankfurt/Main;Zeil;60313;Frankfurt;Zeil;1
+60313;Frankfurt a.M.;Zeil;60313;Frankfurt/M;Zeil;1
+60313;Frankfurt/Main;Zeil;60313;Ffm;Zeil;1
+70173;Stuttgart;Königstraße;70173;Stuttgart;Koenigstrasse;1
+80331;München;Marienplatz;80331;Muenchen;Marienplatz;1
+79539;Lörrach;Hauptstraße;79539;Loerrach;Hauptstr.;1
+12345;Köln;Höhenberger Str.;12345;Koeln;Hoehenberger Str.;1
+10178;Berlin;Alexanderplatz;10178;Berlin;Alex.-Pl.;1
+10178;Berlin;Alexanderpl.;10178;Berlin;Alexander-Platz;1
+10117;Berlin;Unter den Linden;10117;Berlin;U.d. Linden;1
+12345;Hamburg;Sankt Georg;12345;Hamburg;St. Georg;1
+12345;Berlin;Karl-Marx-Str.;12345;Berlin;Karl Marx Strasse;1
+12345;Berlin;An der Spree;12345;Berlin;a.d. Spree;1
+12345;Berlin;Vor dem Tor;12345;Berlin;v.d. Tor;1
+12345;Berlin;Nord;12345;Berlin-N;1
+12345;Berlin;Süd;12345;Berlin-S;1
+12345;Berlin;West;12345;Berlin-W;1
+12345;Berlin;Ost;12345;Berlin-O;1
+10115;Berlin;Invalidenstraße;10117;Berlin;Friedrichstraße;0
+60313;Frankfurt;Zeil;80331;München;Kaufingerstraße;0
+70173;Stuttgart;Königstraße;70174;Stuttgart;Calwerstraße;0
+12345;Berlin-Nord;12345;Berlin-Süd;0
+12345;Hamburg;St. Pauli;12345;Hamburg;St. Georg;0

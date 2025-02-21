@@ -1,3 +1,4 @@
+import io
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -21,6 +22,8 @@ class AddressLoader:
         try:
             self.file = open(self.file_path, 'rb')
             self.mm = mmap.mmap(self.file.fileno(), 0, access=mmap.ACCESS_READ)
+            # Convert mmap to BytesIO for pandas compatibility
+            self.buffer = io.BytesIO(self.mm)
         except Exception as e:
             if hasattr(self, 'file'):
                 self.file.close()
@@ -28,16 +31,16 @@ class AddressLoader:
     
     def __iter__(self) -> Generator[Dict[str, str], None, None]:
         """Yield address records efficiently using memory mapping."""
-        # Reset memory map position
-        self.mm.seek(0)
+        # Reset buffer position
+        self.buffer.seek(0)
         records_yielded = 0
         
         # Use larger chunk size for better performance
         chunk_size = 5000 if self.sample_size is None else min(5000, self.sample_size)
         
-        # Read data in chunks
+        # Read data in chunks using BytesIO buffer
         df_iter = pd.read_csv(
-            self.mm, 
+            self.buffer, 
             delimiter=';',
             chunksize=chunk_size,
             dtype={'nPLZ': str},
@@ -80,12 +83,12 @@ class AddressLoader:
     def load_full(self) -> pd.DataFrame:
         """Load entire dataset efficiently using memory mapping."""
         try:
-            # Reset memory map position
-            self.mm.seek(0)
+            # Reset buffer position
+            self.buffer.seek(0)
             
             # Use a more memory-efficient approach for full loading
             df = pd.read_csv(
-                self.mm,
+                self.buffer,
                 delimiter=';',
                 dtype={'nPLZ': str},
                 low_memory=True   # More memory-efficient at cost of some speed
@@ -102,6 +105,8 @@ class AddressLoader:
     
     def __del__(self):
         """Clean up memory-mapped resources."""
+        if hasattr(self, 'buffer'):
+            self.buffer.close()
         if hasattr(self, 'mm'):
             self.mm.close()
         if hasattr(self, 'file'):
