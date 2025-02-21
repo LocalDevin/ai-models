@@ -18,15 +18,39 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Training and Testing
 ```bash
-python main.py --reference path/to/Strassen.csv --test path/to/test_cases.csv --k 3 --sample-size 1000
+# Train a new model and save it
+python main.py --reference path/to/Strassen.csv --save-model german_v1
+
+# Train and test in one go
+python main.py --reference path/to/Strassen.csv --test path/to/test_cases.csv --save-model german_v1
+
+# Load existing model and test
+python main.py --load-model german_v1 --test path/to/test_cases.csv
 ```
 
 Arguments:
-- `--reference`: Path to reference addresses CSV file (Strassen.csv)
-- `--test`: Path to test addresses CSV file (default: test_data/test_cases.csv)
-- `--k`: Number of matches to return for each query (default: 3)
-- `--sample-size`: Number of reference addresses to sample for testing (default: 1000)
+- `--reference`: Path to reference addresses CSV file for training
+- `--test`: Path to test addresses CSV file
+- `--save-model`: Save trained model with given name
+- `--load-model`: Load existing model with given name
+- `--overwrite`: Overwrite existing model if it exists
+- `--batch-size`: Batch size for training (default: 64)
+- `--epochs`: Number of training epochs (default: 50)
+- `--workers`: Number of worker processes (default: 4)
+- `--device`: Device to use (cuda/cpu)
+- `--sample-size`: Number of reference addresses to sample for training (default: 10000)
+
+### Model Storage
+Models are saved in language-specific directories under `models/`. For example:
+- German models: `models/DE/`
+- English models: `models/EN/`
+
+Each model consists of three files:
+- `{model_name}.pt`: Neural network weights and configuration
+- `{model_name}_cache.pkl`: Embedding cache for faster inference
+- `{model_name}_reference.pkl`: Reference address data
 
 ## Performance
 
