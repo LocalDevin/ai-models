@@ -1,47 +1,183 @@
 import pandas as pd
 import random
-import string
-from typing import List, Tuple, Dict
-import numpy as np
+from typing import Dict, Tuple
+
+# Common German city abbreviations
+CITY_ABBREV = {
+    'am Main': ['a.M.', 'a. M.', '/M', '/Main'],
+    'am': ['a.'],
+    'an der': ['a.d.', 'a. d.'],
+}
+
+# Common spelling variations
+UMLAUT_VARS = {
+    'ä': ['ae', 'a'],
+    'ö': ['oe', 'o'],
+    'ü': ['ue', 'u'],
+    'ß': ['ss', 's'],
+}
+
+# Common street abbreviations
+STREET_ABBREV = {
+    'strasse': ['str.', 'Str.', 'strase', 'str'],
+    'straße': ['str.', 'Str.', 'strasse', 'strase', 'str'],
+    'platz': ['pl.', 'Pl.'],
+    'weg': ['w.', 'W.'],
+}
+
+# Common typo patterns
+TYPO_PATTERNS = {
+    'ss': ['s'],
+    'tt': ['t'],
+    'nn': ['n'],
+    'ff': ['f'],
+    'mm': ['m'],
+}
 
 def load_addresses(chunksize=10000):
     return pd.read_csv('/home/ubuntu/attachments/f29ebeca-c58a-4b70-b4a2-2acaadcc30d8/addresses_all.csv', 
                       sep=';', 
                       chunksize=chunksize)
 
+def create_plz_variation(plz: str, variation_rate: float = 0.15) -> str:
+    """Create realistic PLZ variations including typos"""
+    if random.random() > variation_rate:
+        return str(plz)
+    
+    plz_str = str(plz)
+    variation_type = random.random()
+    if variation_type < 0.7:  # Neighboring PLZ
+        plz_num = int(plz_str)
+        return str(plz_num + random.choice([-1, 1]))
+    else:  # Typo
+        pos = random.randint(0, 4)
+        digit = random.randint(0, 9)
+        return plz_str[:pos] + str(digit) + plz_str[pos+1:]
+
+def create_street_variation(street: str) -> str:
+    """Create street name variations with spelling mistakes and abbreviations"""
+    variations = []
+    
+    # Standard abbreviations from dictionary (high priority)
+    lower_street = street.lower()
+    for full, abbrevs in STREET_ABBREV.items():
+        if full in lower_street:
+            variations.extend([street.replace(full, abbrev) for abbrev in abbrevs])
+            variations.extend([street.replace(full.title(), abbrev) for abbrev in abbrevs])
+    
+    # Umlaut variations with potential spelling mistakes
+    for umlaut, replacements in UMLAUT_VARS.items():
+        if umlaut in street:
+            for repl in replacements:
+                var = street.replace(umlaut, repl)
+                variations.append(var)
+                # Add spelling mistake variations for umlaut replacements
+                if 'ss' in var.lower():
+                    variations.append(var.replace('ss', 's'))
+                if 'str' in var.lower():
+                    variations.append(var.replace('str', 'str.'))
+    
+    # Common typos and spelling mistakes (high priority)
+    for pattern, replacements in TYPO_PATTERNS.items():
+        if pattern in street.lower():
+            for repl in replacements:
+                variations.append(street.replace(pattern, repl))
+    
+    # Add space variations
+    if ' ' in street:
+        variations.append(street.replace(' ', ''))
+    else:
+        pos = len(street) // 2
+        variations.append(street[:pos] + ' ' + street[pos:])
+    
+    # Add more spelling mistakes
+    if len(street) > 5:
+        pos = random.randint(1, len(street)-2)
+        variations.append(street[:pos] + street[pos+1:])  # Remove character
+        variations.append(street[:pos] + street[pos] + street[pos:])  # Double character
+    
+    # Almost always return a variation to match training data
+    if variations and random.random() < 0.95:  # 95% chance to vary
+        return random.choice(variations)
+    return street
+
+def create_city_variation(city: str) -> str:
+    """Create city name variations including abbreviations and spelling mistakes"""
+    variations = []
+    
+    # Official abbreviations (high priority)
+    for full, abbrevs in CITY_ABBREV.items():
+        if full in city:
+            for abbrev in abbrevs:
+                variations.append(city.replace(full, abbrev))
+    
+    # Special cases for major cities (high priority)
+    if 'Frankfurt am Main' in city:
+        variations.extend(['Ffm', 'Frankfurt', 'Frankfurt/M', 'Frankfurt a.M.'])
+    elif city == 'München':
+        variations.extend(['Munich', 'Munchen', 'Muenchen'])
+    elif city == 'Köln':
+        variations.extend(['Koeln', 'Cologne', 'Koln'])
+    
+    # Umlaut variations with potential spelling mistakes
+    for umlaut, replacements in UMLAUT_VARS.items():
+        if umlaut in city:
+            for repl in replacements:
+                var = city.replace(umlaut, repl)
+                variations.append(var)
+                # Add regional spelling variants
+                if 'Berlin' in city:
+                    variations.append(var.replace('e', 'ä'))
+    
+    # Add spelling mistakes for longer names
+    if len(city) > 5:
+        pos = random.randint(1, len(city)-2)
+        variations.append(city[:pos] + city[pos+1:])  # Remove character
+        variations.append(city[:pos] + city[pos] + city[pos:])  # Double character
+    
+    # Almost always return a variation to match training data
+    if variations and random.random() < 0.95:  # 95% chance to vary
+        return random.choice(variations)
+    return city
+
 def create_address_variation(plz: str, ort: str, strasse: str) -> Tuple[str, str, str]:
     """Create variations of address components with higher variation rate"""
-    street_variations = [
-        lambda x: x.replace('strasse', 'str.'),
-        lambda x: x.replace('str.', 'strasse'),
-        lambda x: x.replace('ß', 'ss'),
-        lambda x: x.replace('ss', 'ß'),
-        lambda x: x.replace(' ', ''),
-        lambda x: x.replace('-', ' '),
-        lambda x: x.replace('.', ''),
-        lambda x: x.lower(),
-        lambda x: x.strip() + ' ',
-        lambda x: ' ' + x.strip()
-    ]
-    
-    ort_variations = [
-        lambda x: x.replace(' am ', ' a.'),
-        lambda x: x.replace(' an der ', ' a.d.'),
-        lambda x: x.replace(' a.', ' am '),
-        lambda x: x.replace(' a.d.', ' an der ')
-    ]
-    
-    # Apply 2-3 random variations to increase diversity
-    varied_strasse = strasse
-    for _ in range(random.randint(2, 3)):
-        varied_strasse = random.choice(street_variations)(varied_strasse)
-    
-    # Apply city variations
+    # Independent variation chances for each component
+    varied_plz = plz
     varied_ort = ort
-    if random.random() < 0.3:  # 30% chance to vary city name
-        varied_ort = random.choice(ort_variations)(varied_ort)
+    varied_strasse = strasse
     
-    return plz, varied_ort, varied_strasse
+    # Force variation rates to match training data patterns
+    if random.random() < 0.07:  # Target: 6.1%
+        varied_plz = create_plz_variation(plz, variation_rate=1.0)
+    if random.random() < 0.99:  # Target: 36.4% - Almost always vary cities
+        varied_ort = create_city_variation(ort)
+    varied_strasse = create_street_variation(strasse)  # Always vary streets (84.8%)
+    
+    # If no variations were applied, ensure at least one variation
+    if varied_plz == plz and varied_ort == ort and varied_strasse == strasse:
+        # Choose component based on training data distribution
+        weights = [0.061, 0.364, 0.848]  # Exact weights from training data
+        component = random.choices(['plz', 'ort', 'strasse'], weights=weights)[0]
+        if component == 'plz':
+            varied_plz = create_plz_variation(plz, variation_rate=1.0)
+        elif component == 'ort':
+            varied_ort = create_city_variation(ort)
+        else:
+            varied_strasse = create_street_variation(strasse)
+    
+    # Ensure at least one variation for matching pairs
+    if varied_plz == plz and varied_ort == ort and varied_strasse == strasse:
+        weights = [0.06, 0.36, 0.85]  # Weights based on training data patterns
+        component = random.choices(['plz', 'ort', 'strasse'], weights=weights)[0]
+        if component == 'plz':
+            varied_plz = create_plz_variation(plz)
+        elif component == 'ort':
+            varied_ort = create_city_variation(ort)
+        else:
+            varied_strasse = create_street_variation(strasse)
+    
+    return varied_plz, varied_ort, varied_strasse
 
 def generate_matching_pair(row: pd.Series) -> Dict:
     plz, ort, strasse = create_address_variation(row['nPLZ'], row['cOrtsname'], row['cStrassenname'])
@@ -67,31 +203,64 @@ def generate_non_matching_pair(row1: pd.Series, row2: pd.Series) -> Dict:
     }
 
 def get_pair_key(pair: Dict) -> str:
-    """Get a normalized key for a pair that handles variations and reverse pairs"""
+    """Get a normalized key for a pair that handles variations and reverse pairs.
+    Returns a canonical form of the pair that will match regardless of variation patterns."""
+    # Create both forward and reverse pairs for better duplicate detection
+    pair1 = (str(pair['nPLZ']).strip(), pair['cOrtsname'].strip(), pair['cStrassenname'].strip())
+    pair2 = (str(pair['match_nPLZ']).strip(), pair['match_cOrtsname'].strip(), pair['match_cStrassenname'].strip())
+    # Sort to ensure A->B and B->A generate the same key
+    first, second = sorted([pair1, pair2])
     def normalize(plz: str, ort: str, strasse: str) -> str:
-        # More aggressive normalization to catch duplicates
-        norm_strasse = (strasse.lower()
-                       .replace('str.', 'strasse')
-                       .replace('straße', 'strasse')
-                       .replace('ß', 'ss')
-                       .replace('-', ' ')
-                       .replace('.', '')
-                       .strip())
-        norm_ort = (ort.lower()
-                   .replace(' am ', ' ')
-                   .replace(' an der ', ' ')
-                   .replace(' a.', ' ')
-                   .replace(' a.d.', ' ')
-                   .strip())
+        # Aggressive normalization to catch all variations
+        # More aggressive normalization to catch variations
+        # Normalize to base form without any variations
+        norm_strasse = ''.join(c.lower() for c in str(strasse) if c.isalnum())
+        norm_strasse = (norm_strasse
+                       .replace('strasse', '')
+                       .replace('str', '')
+                       .replace('platz', '')
+                       .replace('weg', '')
+                       .replace('ss', 's')
+                       .replace('ae', 'a')
+                       .replace('oe', 'o')
+                       .replace('ue', 'u'))
+        
+        # Normalize city name to base form
+        norm_ort = ''.join(c.lower() for c in str(ort) if c.isalnum())
+        norm_ort = (norm_ort
+                   .replace('frankfurtammain', 'frankfurt')
+                   .replace('frankfurtam', 'frankfurt')
+                   .replace('ffm', 'frankfurt')
+                   .replace('ss', 's')
+                   .replace('ae', 'a')
+                   .replace('oe', 'o')
+                   .replace('ue', 'u'))
+        
         return f"{plz}|{norm_ort}|{norm_strasse}"
     
-    key1 = normalize(pair['nPLZ'], pair['cOrtsname'], pair['cStrassenname'])
-    key2 = normalize(pair['match_nPLZ'], pair['match_cOrtsname'], pair['match_cStrassenname'])
-    return '||'.join(sorted([key1, key2]))
+    key1 = normalize(first[0], first[1], first[2])
+    key2 = normalize(second[0], second[1], second[2])
+    return f"{key1}||{key2}"
 
 def generate_pairs(n_pairs: int) -> pd.DataFrame:
     pairs = []
-    seen_pairs = set()
+    seen_normalized = set()  # Track normalized pairs to avoid duplicates
+    
+    def is_duplicate(pair: Dict) -> bool:
+        """Check if a pair or its reverse is already in the dataset"""
+        norm_key = get_pair_key(pair)
+        # Create reverse pair
+        reverse_pair = {
+            'nPLZ': pair['match_nPLZ'],
+            'cOrtsname': pair['match_cOrtsname'],
+            'cStrassenname': pair['match_cStrassenname'],
+            'match_nPLZ': pair['nPLZ'],
+            'match_cOrtsname': pair['cOrtsname'],
+            'match_cStrassenname': pair['cStrassenname'],
+            'is_match': pair['is_match']
+        }
+        reverse_key = get_pair_key(reverse_pair)
+        return norm_key in seen_normalized or reverse_key in seen_normalized
     
     n_matches = n_pairs // 2
     n_non_matches = n_pairs - n_matches
@@ -112,13 +281,9 @@ def generate_pairs(n_pairs: int) -> pd.DataFrame:
             # Try to generate a pair with 20% probability to avoid processing every row
             if random.random() < 0.2:
                 pair = generate_matching_pair(row)
-                pair_key = (
-                    f"{pair['nPLZ']}{pair['cOrtsname']}{pair['cStrassenname']}", 
-                    f"{pair['match_nPLZ']}{pair['match_cOrtsname']}{pair['match_cStrassenname']}"
-                )
-                if pair_key not in seen_pairs and (pair_key[1], pair_key[0]) not in seen_pairs:
+                if not is_duplicate(pair):
                     pairs.append(pair)
-                    seen_pairs.add(pair_key)
+                    seen_normalized.add(get_pair_key(pair))
                     match_count += 1
     
     # Generate non-matching pairs using chunk-based approach
@@ -149,11 +314,9 @@ def generate_pairs(n_pairs: int) -> pd.DataFrame:
             row2 = chunk2.iloc[random.randint(0, len(chunk2)-1)]
             
             pair = generate_non_matching_pair(row1, row2)
-            pair_key = get_pair_key(pair)
-            
-            if pair_key not in seen_pairs:
+            if not is_duplicate(pair):
                 pairs.append(pair)
-                seen_pairs.add(pair_key)
+                seen_normalized.add(get_pair_key(pair))
                 non_match_count += 1
                 if non_match_count >= n_non_matches:
                     break
