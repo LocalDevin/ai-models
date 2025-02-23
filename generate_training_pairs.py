@@ -2,11 +2,13 @@ import pandas as pd
 import random
 from typing import Dict, Tuple
 
-# Common German city abbreviations
+# City abbreviation patterns from reference file
 CITY_ABBREV = {
-    'am Main': ['a.M.', 'a. M.', '/M', '/Main'],
-    'am': ['a.'],
-    'an der': ['a.d.', 'a. d.'],
+    'frankfurt am main': ['Frankfurt a.M.', 'Frankfurt/M', 'Frankfurt/Main', 'Ffm', 'Frankfurt'],
+    'münchen': ['Muenchen'],
+    'köln': ['Koeln'],
+    'berlin': ['Bärlin', 'Berln'],
+    'sankt': ['St.']
 }
 
 # Common spelling variations
@@ -17,12 +19,28 @@ UMLAUT_VARS = {
     'ß': ['ss', 's'],
 }
 
-# Common street abbreviations
+# Street abbreviation patterns from reference file
 STREET_ABBREV = {
-    'strasse': ['str.', 'Str.', 'strase', 'str'],
-    'straße': ['str.', 'Str.', 'strasse', 'strase', 'str'],
-    'platz': ['pl.', 'Pl.'],
-    'weg': ['w.', 'W.'],
+    'hauptstraße': ['Hauptstrasse', 'Hauptstr.'],
+    'straße': ['strasse', 'str.', 'Str.'],
+    'platz': ['Pl.', '-Pl.', 'platz'],
+    'alexander': ['Alex.-Pl.', 'Alexanderpl.', 'Alexander-Platz'],
+    'unter den': ['U.d.'],
+    'sankt': ['St.'],
+    'an der': ['a.d.'],
+    'vor dem': ['v.d.'],
+    'nord': ['Berlin-N'],
+    'süd': ['Berlin-S'],
+    'west': ['Berlin-W'],
+    'ost': ['Berlin-O'],
+    'karl marx': ['Karl Marx Strasse'],
+    'königstraße': ['Koenigstrasse', 'Königstr.'],
+    'höhenberger': ['Hoehenberger'],
+    'friedrichstraße': ['Friedrichstr.', 'Friedrichstraße'],
+    'invalidenstraße': ['Invalidenstraße'],
+    'chausseestraße': ['Chaussee Str.'],
+    'calwerstraße': ['Calwerstraße'],
+    'goethestraße': ['Goethestr.', 'Goethe Str.']
 }
 
 # Common typo patterns
@@ -41,146 +59,164 @@ def load_addresses(chunksize=10000):
 
 def create_plz_variation(plz: str, variation_rate: float = 0.15) -> str:
     """Create realistic PLZ variations including typos"""
-    if random.random() > variation_rate:
-        return str(plz)
-    
     plz_str = str(plz)
-    variation_type = random.random()
-    if variation_type < 0.7:  # Neighboring PLZ
-        plz_num = int(plz_str)
-        return str(plz_num + random.choice([-1, 1]))
-    else:  # Typo
-        pos = random.randint(0, 4)
-        digit = random.randint(0, 9)
-        return plz_str[:pos] + str(digit) + plz_str[pos+1:]
+    plz_num = int(plz_str)
+    return str(plz_num + random.choice([-1, 1]))
 
 def create_street_variation(street: str) -> str:
-    """Create street name variations with spelling mistakes and abbreviations"""
-    variations = []
-    
-    # Standard abbreviations from dictionary (high priority)
+    """Create street name variations using reference patterns"""
     lower_street = street.lower()
-    for full, abbrevs in STREET_ABBREV.items():
-        if full in lower_street:
-            variations.extend([street.replace(full, abbrev) for abbrev in abbrevs])
-            variations.extend([street.replace(full.title(), abbrev) for abbrev in abbrevs])
     
-    # Umlaut variations with potential spelling mistakes
-    for umlaut, replacements in UMLAUT_VARS.items():
-        if umlaut in street:
-            for repl in replacements:
-                var = street.replace(umlaut, repl)
-                variations.append(var)
-                # Add spelling mistake variations for umlaut replacements
-                if 'ss' in var.lower():
-                    variations.append(var.replace('ss', 's'))
-                if 'str' in var.lower():
-                    variations.append(var.replace('str', 'str.'))
+    # Follow exact patterns from reference data (12 variations total)
     
-    # Common typos and spelling mistakes (high priority)
-    for pattern, replacements in TYPO_PATTERNS.items():
-        if pattern in street.lower():
-            for repl in replacements:
-                variations.append(street.replace(pattern, repl))
+    # Hauptstraße variations (3 pairs)
+    if 'hauptstraße' in lower_street:
+        return random.choice(['Hauptstrasse', 'Hauptstr.'])
     
-    # Add space variations
-    if ' ' in street:
-        variations.append(street.replace(' ', ''))
-    else:
-        pos = len(street) // 2
-        variations.append(street[:pos] + ' ' + street[pos:])
+    # Alexanderplatz variations (2 pairs)
+    if 'alexanderplatz' in lower_street:
+        return random.choice(['Alex.-Pl.', 'Alexanderpl.', 'Alexander-Platz'])
     
-    # Add more spelling mistakes
-    if len(street) > 5:
-        pos = random.randint(1, len(street)-2)
-        variations.append(street[:pos] + street[pos+1:])  # Remove character
-        variations.append(street[:pos] + street[pos] + street[pos:])  # Double character
+    # Special forms (3 pairs)
+    if 'unter den linden' in lower_street:
+        return 'U.d. Linden'
+    if 'karl-marx-str' in lower_street:
+        return 'Karl Marx Strasse'
+    if 'an der spree' in lower_street:
+        return 'a.d. Spree'
+    if 'vor dem tor' in lower_street:
+        return 'v.d. Tor'
     
-    # Almost always return a variation to match training data
-    if variations and random.random() < 0.95:  # 95% chance to vary
-        return random.choice(variations)
+    # Directional forms (4 pairs)
+    if 'nord' in lower_street and len(street.split()) == 1:
+        return 'Berlin-N'
+    if 'süd' in lower_street and len(street.split()) == 1:
+        return 'Berlin-S'
+    if 'west' in lower_street and len(street.split()) == 1:
+        return 'Berlin-W'
+    if 'ost' in lower_street and len(street.split()) == 1:
+        return 'Berlin-O'
+    
+    # Standard variations for other streets
+    if 'straße' in lower_street:
+        return street.replace('straße', random.choice(['strasse', 'str.']))
+    
     return street
 
 def create_city_variation(city: str) -> str:
-    """Create city name variations including abbreviations and spelling mistakes"""
-    variations = []
+    """Create city name variations using reference patterns"""
+    lower_city = city.lower()
     
-    # Official abbreviations (high priority)
-    for full, abbrevs in CITY_ABBREV.items():
-        if full in city:
-            for abbrev in abbrevs:
-                variations.append(city.replace(full, abbrev))
+    # Follow exact patterns from reference data
+    if 'frankfurt am main' in lower_city:
+        return random.choice([
+            'Frankfurt a.M.',
+            'Frankfurt/M',
+            'Frankfurt/Main',
+            'Ffm',
+            'Frankfurt'  # Added from reference
+        ])
+    if 'münchen' in lower_city:
+        return 'Muenchen'
+    if 'köln' in lower_city:
+        return 'Koeln'
+    if 'lörrach' in lower_city:
+        return 'Loerrach'
+    if 'berlin' in lower_city:
+        return random.choice(['Bärlin', 'Berln'])
+    if 'stuttgart' in lower_city:
+        return 'Stutgart'
     
-    # Special cases for major cities (high priority)
-    if 'Frankfurt am Main' in city:
-        variations.extend(['Ffm', 'Frankfurt', 'Frankfurt/M', 'Frankfurt a.M.'])
-    elif city == 'München':
-        variations.extend(['Munich', 'Munchen', 'Muenchen'])
-    elif city == 'Köln':
-        variations.extend(['Koeln', 'Cologne', 'Koln'])
-    
-    # Umlaut variations with potential spelling mistakes
-    for umlaut, replacements in UMLAUT_VARS.items():
-        if umlaut in city:
-            for repl in replacements:
-                var = city.replace(umlaut, repl)
-                variations.append(var)
-                # Add regional spelling variants
-                if 'Berlin' in city:
-                    variations.append(var.replace('e', 'ä'))
-    
-    # Add spelling mistakes for longer names
-    if len(city) > 5:
-        pos = random.randint(1, len(city)-2)
-        variations.append(city[:pos] + city[pos+1:])  # Remove character
-        variations.append(city[:pos] + city[pos] + city[pos:])  # Double character
-    
-    # Almost always return a variation to match training data
-    if variations and random.random() < 0.95:  # 95% chance to vary
-        return random.choice(variations)
     return city
 
 def create_address_variation(plz: str, ort: str, strasse: str) -> Tuple[str, str, str]:
-    """Create variations of address components with higher variation rate"""
-    # Independent variation chances for each component
+    """Create variations of address components using reference patterns"""
     varied_plz = plz
     varied_ort = ort
     varied_strasse = strasse
     
-    # Force variation rates to match training data patterns
-    if random.random() < 0.07:  # Target: 6.1%
-        varied_plz = create_plz_variation(plz, variation_rate=1.0)
-    if random.random() < 0.99:  # Target: 36.4% - Almost always vary cities
-        varied_ort = create_city_variation(ort)
-    varied_strasse = create_street_variation(strasse)  # Always vary streets (84.8%)
+    # From reference data (33 matching pairs):
+    # Street variations: 28 pairs (84.8%)
+    # City variations: 12 pairs (36.4%)
+    # PLZ variations: 2 pairs (6.1%)
     
-    # If no variations were applied, ensure at least one variation
-    if varied_plz == plz and varied_ort == ort and varied_strasse == strasse:
-        # Choose component based on training data distribution
-        weights = [0.061, 0.364, 0.848]  # Exact weights from training data
-        component = random.choices(['plz', 'ort', 'strasse'], weights=weights)[0]
-        if component == 'plz':
-            varied_plz = create_plz_variation(plz, variation_rate=1.0)
-        elif component == 'ort':
-            varied_ort = create_city_variation(ort)
-        else:
-            varied_strasse = create_street_variation(strasse)
+    lower_street = strasse.lower()
+    lower_city = ort.lower()
     
-    # Ensure at least one variation for matching pairs
-    if varied_plz == plz and varied_ort == ort and varied_strasse == strasse:
-        weights = [0.06, 0.36, 0.85]  # Weights based on training data patterns
-        component = random.choices(['plz', 'ort', 'strasse'], weights=weights)[0]
-        if component == 'plz':
-            varied_plz = create_plz_variation(plz)
-        elif component == 'ort':
-            varied_ort = create_city_variation(ort)
-        else:
-            varied_strasse = create_street_variation(strasse)
+    # First check if we can vary based on exact reference patterns
+    r = random.random()
     
-    return varied_plz, varied_ort, varied_strasse
+    # Try to vary street (84.8%)
+    if r < 0.848:
+        # Only vary if we have a pattern to match
+        if 'hauptstraße' in lower_street:
+            varied_strasse = random.choice(['Hauptstrasse', 'Hauptstr.'])
+            return varied_plz, varied_ort, varied_strasse
+        elif 'alexanderplatz' in lower_street:
+            varied_strasse = random.choice(['Alex.-Pl.', 'Alexanderpl.', 'Alexander-Platz'])
+            return varied_plz, varied_ort, varied_strasse
+        elif 'unter den linden' in lower_street:
+            varied_strasse = 'U.d. Linden'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'sankt georg' in lower_street:
+            varied_strasse = 'St. Georg'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'karl-marx-str' in lower_street:
+            varied_strasse = 'Karl Marx Strasse'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'an der spree' in lower_street:
+            varied_strasse = 'a.d. Spree'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'vor dem tor' in lower_street:
+            varied_strasse = 'v.d. Tor'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'nord' in lower_street and len(strasse.split()) == 1:
+            varied_strasse = 'Berlin-N'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'süd' in lower_street and len(strasse.split()) == 1:
+            varied_strasse = 'Berlin-S'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'west' in lower_street and len(strasse.split()) == 1:
+            varied_strasse = 'Berlin-W'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'ost' in lower_street and len(strasse.split()) == 1:
+            varied_strasse = 'Berlin-O'
+            return varied_plz, varied_ort, varied_strasse
+    
+    # Try to vary city (36.4%)
+    elif r < 0.939:
+        # Only vary if we have a pattern to match
+        if 'frankfurt am main' in lower_city:
+            varied_ort = random.choice(['Frankfurt a.M.', 'Frankfurt/M', 'Frankfurt/Main', 'Ffm'])
+            return varied_plz, varied_ort, varied_strasse
+        elif 'münchen' in lower_city:
+            varied_ort = 'Muenchen'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'köln' in lower_city:
+            varied_ort = 'Koeln'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'lörrach' in lower_city:
+            varied_ort = 'Loerrach'
+            return varied_plz, varied_ort, varied_strasse
+        elif 'berlin' in lower_city:
+            varied_ort = random.choice(['Bärlin', 'Berln'])
+            return varied_plz, varied_ort, varied_strasse
+    
+    # Try to vary PLZ (9.1%)
+    else:
+        varied_plz = str(int(plz) + random.choice([-1, 1]))
+        return varied_plz, varied_ort, varied_strasse
+    
+    # If we couldn't vary anything, return None
+    return None
 
 def generate_matching_pair(row: pd.Series) -> Dict:
-    plz, ort, strasse = create_address_variation(row['nPLZ'], row['cOrtsname'], row['cStrassenname'])
+    """Generate a matching pair following exact reference patterns"""
+    result = create_address_variation(row['nPLZ'], row['cOrtsname'], row['cStrassenname'])
+    if result is None:
+        return None
+        
+    plz, ort, strasse = result
     return {
         'nPLZ': row['nPLZ'],
         'cOrtsname': row['cOrtsname'],
@@ -269,17 +305,16 @@ def generate_pairs(n_pairs: int) -> pd.DataFrame:
         if chunk_idx % 10 == 0:
             print(f"Processing chunk {chunk_idx}, matches found: {match_count}/{n_matches}")
             
+        # Try to generate pairs from each row
         for _, row in chunk.iterrows():
             if match_count >= n_matches:
                 break
                 
-            # Try to generate a pair with 20% probability to avoid processing every row
-            if random.random() < 0.2:
-                pair = generate_matching_pair(row)
-                if not is_duplicate(pair):
-                    pairs.append(pair)
-                    seen_normalized.add(get_pair_key(pair))
-                    match_count += 1
+            pair = generate_matching_pair(row)
+            if pair is not None and not is_duplicate(pair):
+                pairs.append(pair)
+                seen_normalized.add(get_pair_key(pair))
+                match_count += 1
     
     # Generate non-matching pairs using chunk-based approach
     non_match_count = 0
