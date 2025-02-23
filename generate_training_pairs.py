@@ -202,41 +202,36 @@ def generate_non_matching_pair(row1: pd.Series, row2: pd.Series) -> Dict:
         'is_match': 0
     }
 
-def get_pair_key(pair: Dict) -> str:
-    """Get a normalized key for a pair that handles variations and reverse pairs.
-    Returns a canonical form of the pair that will match regardless of variation patterns."""
-    # Create both forward and reverse pairs for better duplicate detection
-    pair1 = (str(pair['nPLZ']).strip(), pair['cOrtsname'].strip(), pair['cStrassenname'].strip())
-    pair2 = (str(pair['match_nPLZ']).strip(), pair['match_cOrtsname'].strip(), pair['match_cStrassenname'].strip())
-    # Sort to ensure A->B and B->A generate the same key
-    first, second = sorted([pair1, pair2])
-    def normalize(plz: str, ort: str, strasse: str) -> str:
-        # Aggressive normalization to catch all variations
-        # More aggressive normalization to catch variations
-        # Normalize to base form without any variations
-        norm_strasse = ''.join(c.lower() for c in str(strasse) if c.isalnum())
-        norm_strasse = (norm_strasse
-                       .replace('strasse', '')
-                       .replace('str', '')
-                       .replace('platz', '')
-                       .replace('weg', '')
-                       .replace('ss', 's')
-                       .replace('ae', 'a')
-                       .replace('oe', 'o')
-                       .replace('ue', 'u'))
-        
-        # Normalize city name to base form
-        norm_ort = ''.join(c.lower() for c in str(ort) if c.isalnum())
-        norm_ort = (norm_ort
-                   .replace('frankfurtammain', 'frankfurt')
-                   .replace('frankfurtam', 'frankfurt')
-                   .replace('ffm', 'frankfurt')
+def normalize(plz: str, ort: str, strasse: str) -> str:
+    """Normalize address components to a canonical form for comparison"""
+    norm_strasse = ''.join(c.lower() for c in str(strasse) if c.isalnum())
+    norm_strasse = (norm_strasse
+                   .replace('strasse', '')
+                   .replace('str', '')
+                   .replace('platz', '')
+                   .replace('weg', '')
                    .replace('ss', 's')
                    .replace('ae', 'a')
                    .replace('oe', 'o')
                    .replace('ue', 'u'))
-        
-        return f"{plz}|{norm_ort}|{norm_strasse}"
+    
+    norm_ort = ''.join(c.lower() for c in str(ort) if c.isalnum())
+    norm_ort = (norm_ort
+               .replace('frankfurtammain', 'frankfurt')
+               .replace('frankfurtam', 'frankfurt')
+               .replace('ffm', 'frankfurt')
+               .replace('ss', 's')
+               .replace('ae', 'a')
+               .replace('oe', 'o')
+               .replace('ue', 'u'))
+    
+    return f"{plz}|{norm_ort}|{norm_strasse}"
+
+def get_pair_key(pair: Dict) -> str:
+    """Get a normalized key for a pair that handles variations and reverse pairs"""
+    pair1 = (str(pair['nPLZ']).strip(), pair['cOrtsname'].strip(), pair['cStrassenname'].strip())
+    pair2 = (str(pair['match_nPLZ']).strip(), pair['match_cOrtsname'].strip(), pair['match_cStrassenname'].strip())
+    first, second = sorted([pair1, pair2])
     
     key1 = normalize(first[0], first[1], first[2])
     key2 = normalize(second[0], second[1], second[2])
@@ -331,10 +326,6 @@ def generate_pairs(n_pairs: int) -> pd.DataFrame:
 if __name__ == '__main__':
     # Generate 5000 pairs
     pairs_df = generate_pairs(5000)
-    
-    # Save to file
-    output_file = 'training_sets/address_training_german'
-    pairs_df.to_csv(output_file, index=False)
     
     # Save to file with semicolon separator to match input format
     output_file = 'training_sets/address_training_german'
